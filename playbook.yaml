@@ -1,0 +1,181 @@
+- name: My first play
+  hosts: localhost
+  become: yes
+
+  vars:
+    #Do not edit unless you intend to install a newer guacamole release
+    guac_ver: "1.5.0"
+
+  tasks:
+    - name: Perform Debian Specific Tasks
+      include_tasks: debian.yaml
+      when: ansible_os_family == 'Debian'
+
+    - name: Populate service facts
+      service_facts:
+
+    - name: Populate package facts
+      package_facts:
+        manager: "auto"
+
+    # - name: Print Service Facts
+    #   debug:
+    #     var: ansible_facts.services
+
+    # - name: Print Package Facts
+    #   debug:
+    #     var: ansible_facts.packages
+
+    - name: Open Firewall for Guacamole/Tomcat on 8080/TCP
+      firewalld:
+        port: 8080/tcp
+        permanent: yes
+        state: enabled
+        immediate: yes
+      when: ('firewalld.service' in ansible_facts.services) and ('firewalld' in ansible_facts.packages)
+
+
+    - name: Create the guac extensions, lib, and pref directories (Debian Family)
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0700'
+        owner: tomcat
+        group: tomcat
+      loop:
+        - /etc/guacamole/extensions
+        - /etc/guacamole/lib
+        - /etc/guacamole/
+      when: ansible_os_family == "Debian"
+
+    - name: Download Guacamole Web App and verify checksum (sha256)
+      get_url:
+        url: https://apache.org/dyn/closer.lua/guacamole/{{ guac_ver }}/binary/guacamole-{{ guac_ver }}.war?action=download
+        dest: /var/lib/tomcat9/webapps/guacamole.war
+        checksum: sha256:https://downloads.apache.org/guacamole/{{ guac_ver }}/binary/guacamole-{{ guac_ver }}.war.sha256
+
+
+    - name: Change Owner of Guacamole Web App (Debian Family)
+      file:
+        path: /var/lib/tomcat9/webapps/guacamole.war
+        owner: tomcat
+        group: tomcat
+        mode: '0744'
+      when: ansible_os_family == "Debian"
+
+    - name: Download Guacamole Server and verify checksum (sha256)
+      get_url:
+        url: https://apache.org/dyn/closer.lua/guacamole/{{ guac_ver }}/source/guacamole-server-{{ guac_ver }}.tar.gz?action=download
+        dest: /tmp/guacamole-server-{{ guac_ver }}.tar.gz
+        checksum: sha256:https://downloads.apache.org/guacamole/{{ guac_ver }}/source/guacamole-server-{{ guac_ver }}.tar.gz.sha256
+
+    - name: Unarchive Guacamole Server Tarball
+      unarchive:
+        src: /tmp/guacamole-server-{{ guac_ver }}.tar.gz
+        dest: /tmp/
+        remote_src: yes
+
+    - name: Download Guacamole Client and verify checksum (sha256)
+      get_url:
+        url: https://apache.org/dyn/closer.lua/guacamole/{{ guac_ver }}/source/guacamole-client-{{ guac_ver }}.tar.gz?action=download
+        dest: /tmp/guacamole-client-{{ guac_ver }}.tar.gz
+        checksum: sha256:https://downloads.apache.org/guacamole/{{ guac_ver }}/source/guacamole-client-{{ guac_ver }}.tar.gz.sha256
+
+    - name: Unarchive Guacamole Client Tarball
+      unarchive:
+        src: /tmp/guacamole-client-{{ guac_ver }}.tar.gz
+        dest: /tmp/
+        remote_src: yes
+
+    - name: Configure, Make, and Install the Guacamole Server
+      shell:
+        chdir: /tmp/guacamole-server-{{ guac_ver }}
+        cmd: ./configure --with-init-dir=/etc/init.d > /tmp/configure.log
+
+
+    - name: Build the default target
+      make:
+        chdir: /tmp/guacamole-server-{{ guac_ver }}
+
+    - name: Run 'install' target
+      make:
+        chdir: /tmp/guacamole-server-{{ guac_ver }}
+        target: install
+
+    - name: Run ldconfig
+      shell:
+        cmd: ldconfig
+      when: ansible_os_family == "Debian"
+
+    - name: Configure Tomcat9, MariaDB, and GuacD
+      service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - "tomcat9"
+        - "guacd"
+
+    - name: Create Guacamole Properties File
+      copy:
+        dest: "/etc/guacamole/guacamole.properties"
+        content: |
+          guacd-hostname: localhost
+          guacd-port:    4822
+          user-mapping:    /etc/guacamole/user-mapping.xml
+          auth-provider:    net.sourceforge.guacamole.net.basic.BasicFileAuthenticationProvider
+
+    - name: Create Guacamole user mapping File
+      copy:
+        dest: "/etc/guacamole/user-mapping.xml"
+        content: |
+          <user-mapping>
+
+          <!-- Per-user authentication and config information -->
+
+          <!-- A user using md5 to hash the password
+              guacadmin user and its md5 hashed password below is used to 
+                  login to Guacamole Web UI-->
+          <!-- FIRST USER -->
+          <authorize 
+                  username="GeeksAdmin"
+                  password="2df81f5bfb14c621dbfd98e0d08c2f35"
+                  encoding="md5">
+
+          </authorize>
+
+          </user-mapping>
+
+    - name: Secure the properties file (Debian Family)
+      file:
+        path: /etc/guacamole/user-mapping.xml
+        owner: tomcat
+        group: tomcat
+        mode: '0400'
+      when: ansible_os_family == "Debian"
+
+    - name: Secure the usermapping file (Debian Family)
+      file:
+        path: /etc/guacamole/guacamole.properties
+        owner: tomcat
+        group: tomcat
+        mode: '0400'
+      when: ansible_os_family == "Debian"
+
+
+    - name: Restart Tomcat
+      service:
+        name: tomcat9
+        state: restarted
+
+    - name: Cleanup
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /tmp/guacamole-auth-jdbc-{{ guac_ver }}
+        - /tmp/guacamole-auth-jdbc-{{ guac_ver }}.tar.gz
+        - /tmp/guacamole-client-{{ guac_ver }}
+        - /tmp/guacamole-client-{{ guac_ver }}.tar.gz
+        - /tmp/guacamole-server-{{ guac_ver }}
+        - /tmp/guacamole-server-{{ guac_ver }}.tar.gz

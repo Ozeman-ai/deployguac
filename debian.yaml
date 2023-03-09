@@ -1,0 +1,45 @@
+# Perform Debian/Ubuntu specific setup tasks
+---
+- name: Add nginx stable repository from PPA and install its signing key on Ubuntu target
+  ansible.builtin.apt_repository:
+    repo: ppa:remmina-ppa-team/remmina-next-daily
+
+- name: Update system packages
+  package: 
+    name: '*'
+    state: latest
+
+- name: Install Dependencies
+  package:
+    name:
+     - make
+     - gcc
+     - vim
+     - curl
+     - wget
+     - g++
+     - libcairo2-dev
+     - libjpeg-turbo8-dev
+     - libpng-dev
+     - libtool-bin
+     - libossp-uuid-dev
+     - libavcodec-dev
+     - libavformat-dev
+     - libavutil-dev
+     - libswscale-dev
+     - build-essential
+     - libpango1.0-dev
+     - libssh2-1-dev
+     - libvncserver-dev
+     - libtelnet-dev
+     - libpulse-dev
+     - libssl-dev
+     - libvorbis-dev
+     - libwebp-dev
+     - libwebsockets-dev
+     - freerdp2-dev 
+     - freerdp2-x11
+     - openjdk-11-jdk
+     - tomcat9
+
+    state: present
