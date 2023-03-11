@@ -18,14 +18,6 @@
       package_facts:
         manager: "auto"
 
-    # - name: Print Service Facts
-    #   debug:
-    #     var: ansible_facts.services
-
-    # - name: Print Package Facts
-    #   debug:
-    #     var: ansible_facts.packages
-
     - name: Open Firewall for Guacamole/Tomcat on 8080/TCP
       firewalld:
         port: 8080/tcp
@@ -91,7 +83,6 @@
       shell:
         chdir: /tmp/guacamole-server-{{ guac_ver }}
         cmd: ./configure --with-init-dir=/etc/init.d > /tmp/configure.log
-
 
     - name: Build the default target
       make:
@@ -162,7 +153,14 @@
         mode: '0400'
       when: ansible_os_family == "Debian"
 
-
+    - name: Copy guacamole-noauth to tomcat9 extenion folder (Debian Family)
+      copy:
+        src: ~/deployguac/guacamole-auth-noauth-1.5.0.jar
+        dest: /etc/guacamole/extensions/
+        owner: tomcat
+        group: tomcat
+        mode: '0744'
+      
     - name: Restart Tomcat
       service:
         name: tomcat9
@@ -173,8 +171,7 @@
         path: "{{ item }}"
         state: absent
       loop:
-        - /tmp/guacamole-auth-jdbc-{{ guac_ver }}
-        - /tmp/guacamole-auth-jdbc-{{ guac_ver }}.tar.gz
+        - ~/deployguac/guacamole-auth-noauth-1.5.0.jar
         - /tmp/guacamole-client-{{ guac_ver }}
         - /tmp/guacamole-client-{{ guac_ver }}.tar.gz
         - /tmp/guacamole-server-{{ guac_ver }}
