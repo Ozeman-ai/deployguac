@@ -133,6 +133,29 @@
         owner: tomcat
         group: tomcat
         mode: '0744'
+        
+    - name: Change default tomcat page
+        copy:
+          dest: "/var/lib/tomcat9/webapps/ROOT/index.html"
+          content: |
+            <!DOCTYPE html>
+              <html>
+                <head>
+                <meta http-equiv="refresh" content="0; url='/guacamole'" />
+                </head>
+                <body>
+                <p>Please follow <a href="/guacamole">this link</a>.</p>
+                </body>
+              </html>
+
+    - name: Secure the index page
+        file:
+          path: /var/lib/tomcat9/webapps/ROOT/index.html
+          owner: tomcat
+          group: tomcat
+          mode: '0400'
+        when: ansible_os_family == "Debian"
+
       
     - name: Restart Tomcat
       service:
