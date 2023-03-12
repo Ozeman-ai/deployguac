@@ -118,14 +118,6 @@
           # NoAuth properties
           noauth-config: /etc/guacamole/noauth-config.xml
 
-    - name: Secure the config file (Debian Family)
-      file:
-        path: /etc/guacamole/noauth-config.xml
-        owner: tomcat
-        group: tomcat
-        mode: '0400'
-      when: ansible_os_family == "Debian"
-
     - name: Secure the properties file (Debian Family)
       file:
         path: /etc/guacamole/guacamole.properties
