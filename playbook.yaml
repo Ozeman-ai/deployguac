@@ -1,4 +1,4 @@
-- name: My first play
+- name: installGuac
   hosts: localhost
   become: yes
 
@@ -46,7 +46,6 @@
         dest: /var/lib/tomcat9/webapps/guacamole.war
         checksum: sha256:https://downloads.apache.org/guacamole/{{ guac_ver }}/binary/guacamole-{{ guac_ver }}.war.sha256
 
-
     - name: Change Owner of Guacamole Web App (Debian Family)
       file:
         path: /var/lib/tomcat9/webapps/guacamole.war
@@ -57,9 +56,9 @@
 
     - name: Download Guacamole Server and verify checksum (sha256)
       get_url:
-        url: https://apache.org/dyn/closer.lua/guacamole/{{ guac_ver }}/source/guacamole-server-{{ guac_ver }}.tar.gz?action=download
+        url: https://dlcdn.apache.org/guacamole/1.5.0/source/guacamole-server-1.5.0.tar.gz
         dest: /tmp/guacamole-server-{{ guac_ver }}.tar.gz
-        checksum: sha256:https://downloads.apache.org/guacamole/{{ guac_ver }}/source/guacamole-server-{{ guac_ver }}.tar.gz.sha256
+        checksum: sha256:https://dlcdn.apache.org/guacamole/1.5.0/source/guacamole-server-1.5.0.tar.gz.sha256
 
     - name: Unarchive Guacamole Server Tarball
       unarchive:
@@ -69,9 +68,9 @@
 
     - name: Download Guacamole Client and verify checksum (sha256)
       get_url:
-        url: https://apache.org/dyn/closer.lua/guacamole/{{ guac_ver }}/source/guacamole-client-{{ guac_ver }}.tar.gz?action=download
+        url: https://dlcdn.apache.org/guacamole/1.5.0/source/guacamole-client-1.5.0.tar.gz
         dest: /tmp/guacamole-client-{{ guac_ver }}.tar.gz
-        checksum: sha256:https://downloads.apache.org/guacamole/{{ guac_ver }}/source/guacamole-client-{{ guac_ver }}.tar.gz.sha256
+        checksum: sha256:https://dlcdn.apache.org/guacamole/1.5.0/source/guacamole-client-1.5.0.tar.gz.sha256
 
     - name: Unarchive Guacamole Client Tarball
       unarchive:
@@ -113,39 +112,21 @@
         content: |
           guacd-hostname: localhost
           guacd-port:    4822
-          user-mapping:    /etc/guacamole/user-mapping.xml
-          auth-provider:    net.sourceforge.guacamole.net.basic.BasicFileAuthenticationProvider
+          # Auth provider class
+          auth-provider: net.sourceforge.guacamole.net.auth.noauth.NoAuthenticationProvider
 
-    - name: Create Guacamole user mapping File
-      copy:
-        dest: "/etc/guacamole/user-mapping.xml"
-        content: |
-          <user-mapping>
+          # NoAuth properties
+          noauth-config: /etc/guacamole/noauth-config.xml
 
-          <!-- Per-user authentication and config information -->
-
-          <!-- A user using md5 to hash the password
-              guacadmin user and its md5 hashed password below is used to 
-                  login to Guacamole Web UI-->
-          <!-- FIRST USER -->
-          <authorize 
-                  username="GeeksAdmin"
-                  password="2df81f5bfb14c621dbfd98e0d08c2f35"
-                  encoding="md5">
-
-          </authorize>
-
-          </user-mapping>
-
-    - name: Secure the properties file (Debian Family)
+    - name: Secure the config file (Debian Family)
       file:
-        path: /etc/guacamole/user-mapping.xml
+        path: /etc/guacamole/noauth-config.xml
         owner: tomcat
         group: tomcat
         mode: '0400'
       when: ansible_os_family == "Debian"
 
-    - name: Secure the usermapping file (Debian Family)
+    - name: Secure the properties file (Debian Family)
       file:
         path: /etc/guacamole/guacamole.properties
         owner: tomcat
@@ -153,9 +134,9 @@
         mode: '0400'
       when: ansible_os_family == "Debian"
 
-    - name: Copy guacamole-noauth to tomcat9 extenion folder (Debian Family)
+    - name: Copy guacamole-noauth to tomcat9 extension folder (Debian Family)
       copy:
-        src: ~/deployguac/guacamole-auth-noauth-1.5.0.jar
+        src: guacamole-auth-noauth-1.5.0.jar
         dest: /etc/guacamole/extensions/
         owner: tomcat
         group: tomcat
@@ -171,7 +152,7 @@
         path: "{{ item }}"
         state: absent
       loop:
-        - ~/deployguac/guacamole-auth-noauth-1.5.0.jar
+        - guacamole-auth-noauth-1.5.0.jar
         - /tmp/guacamole-client-{{ guac_ver }}
         - /tmp/guacamole-client-{{ guac_ver }}.tar.gz
         - /tmp/guacamole-server-{{ guac_ver }}
